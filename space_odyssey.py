@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+# br0k3ns0und
+# MIT License
 
 import re
-
-
 import argparse
-
-
 
 # args
 parser = argparse.ArgumentParser(description='encode message in whitespace of the message\n'

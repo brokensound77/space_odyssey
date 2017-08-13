@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import re
 
@@ -6,59 +7,23 @@ import re
 import argparse
 
 
-def set_args():
 
-    ##
-    # decode
-    # encode    default
+# args
+parser = argparse.ArgumentParser(description='encode message in whitespace of the message\n'
+                                             '')
+parser.add_argument('-d', '--decode', action='store_true', help='decodes message from whitespace of message')
+parser.add_argument('-o', '--outfile', type=str, help='write output to the selected file, rather than to stdout')
 
-    # message
-    #   stdin   default
-    #   file
+group1 = parser.add_mutually_exclusive_group()
+group1.add_argument('-s', '--secret', type=str, help='secret to be hidden in the message')
+group1.add_argument('-sf', '--secret-file', type=str, help='secret text from file to be hidden in the message')
 
-    # text
-    #   stdin   default
-    #   file
+group2 = parser.add_mutually_exclusive_group(required=True)
+group2.add_argument('-t', '--message', type=str, help='message where secret will be hidden via whitespace')
+group2.add_argument('-tf', '--message-file', type=str,
+                    help='message text from file where secret will be hidden via whitespace')
+args = parser.parse_args()
 
-    # output
-    #   stdout  default
-    #   file
-
-    # args
-    parser = argparse.ArgumentParser()
-    # stdout (default), outfile, stdin, infile, encode (default), decode
-    # true               str      true   str            mutual ex group
-
-    parser.add_argument('-d', '--decode', action='store_true', help='encodes message in whitespace of text')
-
-    group1 = parser.add_mutually_exclusive_group(required=True)
-    group1.add_argument('-sm', '--secret-message', type=str, help='message to be secretly hidden in the text')
-    group1.add_argument('-sf', '--secret-file', type=str, help='message from file to be secretly hidden in the text')
-
-
-
-    in_group = parser.add_mutually_exclusive_group()
-    #in_group.add_argument('text', type=str, help='text from stdin to be encoded with hidden message')
-    #in_group.add_argument('-i', '--infile', type=str, help='read from the selected file rather than from stdin')
-    out_group = parser.add_mutually_exclusive_group()
-    out_group.add_argument("-v", "--verbose", action="store_true")
-
-    #parser.add_argument('-d', '--decode', action='store_true', help='decodes a space encoded document')
-    parser.add_argument('-o', '--outfile', type=str, help='write output to the selected file, rather than to stdout')
-
-
-
-
-    parser.add_argument('-a', '--alerts', action='store_true', help='retrieves new alerts')
-    parser.add_argument('-s', '--systems', action='count', default=0,
-                        help='retrieves systems information; ss for FULL details in JSON (NOISY!)')
-    parser.add_argument('-i', '--instance', type=str, help='cid for specific customer instance')
-    parser.add_argument('-c', '--config-file', type=str, help='select a config file with user credentials')
-    parser.add_argument('-l', '--loop', type=int, choices=[1,2,3,4,5,6,7,8,9,10,11,12],
-                        help='runs toruk in a loop, for the number of hours passed')
-    parser.add_argument('-f', '--frequency', type=int, default=1, help='frequency (in minutes) for the loop to resume')
-    parser.add_argument('-q', '--quiet', action='store_true', help='suppresses errors from alert retrieval failures')
-    args = parser.parse_args()
 
 
 # from https://stackoverflow.com/questions/7396849/convert-binary-to-ascii-and-vice-versa
@@ -66,41 +31,90 @@ def string2bits(s=''):
     return [bin(ord(x))[2:].zfill(8) for x in s]
 
 
+# from https://stackoverflow.com/questions/7396849/convert-binary-to-ascii-and-vice-versa
 def bits2string(b=None):
     return ''.join([chr(int(x, 2)) for x in b])
 
 
 def set_secret(secret, text):
+    """
+    :param secret: the message to be hidden
+    :param text: the text to hide the message in
+    :return: the white-space encoded message
+    """
     lines = text.split()
     lines.reverse()
-    print 'Number of letters: {0}\nNumber of spaces needed: {1}\nNumber of possible spaces: {2}'.format(
-            len(secret), len(secret) * 8, len(lines) - 1)
+    # checks to ensure that there are enough potential white spaces for the message in binary
     if len(lines) - 1 < len(secret) * 8:
         raise Exception('Secret is too long for the text provided')
     bin_secret = string2bits(secret)
     encoded_message = ''
-    count = 0
     for letter in bin_secret:
         for bit in letter:
             if int(bit) == 0:
+                # zero represented by single space
                 encoded_message += lines.pop() + ' '
             elif int(bit) == 1:
+                # one represented by double space
                 encoded_message += lines.pop() + '  '
-        count += 1
+    lines.reverse()
+    # concatenate the remainder of the original message
+    encoded_message += ' '.join(lines)
     return encoded_message
-
-y = set_secret('hi', 'Its alright to tell me what you think about me. I wont try to argue or hold it against you, I know that youre leaving')
-print y
 
 
 def get_secret(text):
+    """
+    :param text: the white-space encoded message
+    :return: the secret message
+    """
+    # make a list of all of the white space 1-2 wide
     raw_space = re.findall('\s{1,2}', text)
-    #raw_space_count = map(len, raw_space)
+    # decrement them all by 1 (to represent binary)
     raw_bits = map(lambda z: str(len(z)-1), raw_space)
+    # assemble a new list consisting of lists 8 wide (byte)
     bits_list = []
     for i in xrange(len(raw_bits) / 8):
         tmp = (i + 1) * 8
         bits_list.append(''.join(raw_bits[tmp - 8:tmp]))
     return bits2string(bits_list)
 
-print get_secret(y)
+
+def space_secret():
+    if args.message is not None:
+        local_message = args.message
+    else:
+        with open(args.message_file, 'rb') as f:
+            local_message = f.read()
+
+    # decode
+    if args.decode:
+        if args.outfile is not None:
+            with open(args.outfile, 'wb') as f:
+                f.write(get_secret(local_message))
+        else:
+            print get_secret(local_message)
+    else:
+        # encoode
+        if args.secret is not None:
+            local_secret = args.secret
+        else:
+            with open(args.secret_file, 'rb') as f:
+                local_secret = f.read()
+        if args.outfile is not None:
+            with open(args.outfile, 'wb') as f:
+                try:
+                    f.write(set_secret(local_secret, local_message))
+                except Exception as e:
+                    print 'There was an error: {0}'.format(e)
+                    exit(2)
+        else:
+            print 'Number of letters: {0}\nNumber of spaces needed: {1}\nNumber of possible spaces: {2}'.format(
+                len(local_secret), len(local_secret) * 8, len(local_message.split()) - 1)
+            try:
+                print set_secret(local_secret, local_message)
+            except Exception as e:
+                print 'There was an error: {0}'.format(e)
+                exit(2)
+
+space_secret()

@@ -7,10 +7,10 @@ from string import printable
 import random
 
 parser = argparse.ArgumentParser(description='encode secret in the characters of a message (light stego)')
-parser.add_argument('-i', '--in-text', description='message to use to hide secret')
-parser.add_argument('-s', '--secret', description='the secret message')
-parser.add_argument('-d', '--decode', action='store_true', description='decode using a code and the original message')
-parser.add_argument('-c', '--code', description='the code provided from the encoding')
+parser.add_argument('-i', '--in-text', help='message to use to hide secret')
+parser.add_argument('-s', '--secret', help='the secret message')
+parser.add_argument('-d', '--decode', action='store_true', help='decode using a code and the original message')
+parser.add_argument('-c', '--code', help='the code provided from the encoding')
 args = parser.parse_args()
 
 
